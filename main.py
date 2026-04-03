@@ -1,8 +1,15 @@
 ﻿import os
 import json
+import pandas as pd
 from openai import OpenAI
 
-# 1. 安全读取配置（保持之前跑通的代码不变）
+# 从 tools 导入我们刚刚写的模块
+import sys
+sys.path.append(os.path.dirname(__file__))
+from tools.anomaly_detection import detect_anomalies
+from tools.data_imputation import impute_missing_values
+
+# 1. 安全读取配置
 api_key = None
 env_path = os.path.join(os.path.dirname(__file__) or ".", ".env")
 try:
@@ -15,76 +22,104 @@ except Exception: pass
 
 client = OpenAI(api_key=api_key, base_url="https://api.deepseek.com")
 
-# =====================================================================
-# ★ 新增内容：这是我们写的一个“本地工具” (未来的工业算法就会放在这种函数里)
-# =====================================================================
-def get_weather(location: str):
-    """一个假的本地天气工具，其实是我们自己写的判断逻辑"""
-    print(f"\n[后台系统]：🔧 探测到大模型想要调用工具，正在本地执行 get_weather(location='{location}')...")
-    if "北京" in location:
-        return json.dumps({"location": "北京", "temperature": "18度", "condition": "晴朗带一点霾"})
-    elif "上海" in location:
-        return json.dumps({"location": "上海", "temperature": "22度", "condition": "下雨"})
-    else:
-        return json.dumps({"location": location, "temperature": "未知", "condition": "我的工具里没录入这个城市"})
+def extract_data_summary(file_path: str = "data/sample_data.csv"):
+    """读取本地CSV概况"""
+    print(f"\n[后台系统]：🔧 正在用 Pandas 分析 {file_path}...")
+    try:
+        df = pd.read_csv(file_path)
+        summary = f"数据集总共有 {len(df)} 行。\n包含列：{list(df.columns)}。\n各列缺失值的数量为：\n{df.isnull().sum().to_string()}\n各列的数值统计信息为：\n{df.describe().to_string()}"
+        return json.dumps({"status": "success", "data_summary": summary}, ensure_ascii=False)
+    except Exception as e:
+        return json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False)
 
 # =====================================================================
-# ★ 我们要把工具的“说明书”写出来给大模型看
+# ★ 工具说明书库 (包含感知层、填补、异常检测)
 # =====================================================================
 tools_description = [
     {
         "type": "function",
         "function": {
-            "name": "get_weather",
-            "description": "当用户问到天气时，必须调用这个工具来获取准确温度。",
+            "name": "extract_data_summary",
+            "description": "第一步调用：读取传感器数据表的情况（有无空缺、最大最小值等）",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "location": {
-                        "type": "string",
-                        "description": "用户提到的城市名字，例如 '北京'"
-                    }
+                    "file_path": {"type": "string", "description": "文件路径，默认 'data/sample_data.csv'"}
+                }
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "impute_missing_values",
+            "description": "第二步调用：用来填补表格中特定列(比如 temperature)的缺失值空缺",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "file_path": {"type": "string", "description": "文件路径"},
+                    "column": {"type": "string", "description": "需要填补缺失值的列名，例如 'temperature'"},
+                    "method": {"type": "string", "enum": ["mean", "forward"], "description": "填补方法"}
                 },
-                "required": ["location"]
+                "required": ["file_path", "column", "method"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "detect_anomalies",
+            "description": "第三步调用：用来检测某一列中的异常值(如温度突然超高)",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "file_path": {"type": "string"},
+                    "column": {"type": "string", "description": "要检测的列"}
+                },
+                "required": ["file_path", "column"]
             }
         }
     }
 ]
 
-print("📡 开始对话：大牛，请问北京现在天气怎么样？\n")
+print("📡 开始多轮对话：让大模型完成闭环任务：\n")
+user_prompt = "大牛，我们的任务是自动诊断 data/sample_data.csv。\n请按顺序执行：1. 先读取数据概况；2. 如果有缺失值，请补全temperature列；3. 补全后立刻使用孤立森林检测该列的异常值。每做完一步请向我汇报！"
+messages = [{"role": "user", "content": user_prompt}]
 
-# =====================================================================
-# ★ 正式沟通：把用户的提问和“工具箱”一起扔给大模型
-# =====================================================================
-response = client.chat.completions.create(
-    model="deepseek-chat",
-    messages=[
-        {"role": "user", "content": "大牛，请结合目前天气数据告诉我，北京现在天气怎么样？"}
-    ],
-    tools=tools_description,  # 划重点：告诉大模型“你手边有锤子可以用！”
-    tool_choice="auto"        # 划重点：让大模型“自己决定”要不要用锤子
-)
-
-# =====================================================================
-# ★ 见证奇迹：分析大模型的返回值大模型想要干啥？
-# =====================================================================
-ai_message = response.choices[0].message
-
-if ai_message.tool_calls:
-    # 说明大模型觉得自己的脑子算不出来，它决定“动用工具”了！
-    print("🤖 [大模型]：我不知道天气，但我决定调用你给我的工具！")
-    tool_call = ai_message.tool_calls[0]
+# 由于需要大模型按顺序调用三个工具，我们写一个循环让他可以“思考并行动”3次
+for step in range(4):
+    print(f"--- 循环思考 第 {step+1} 轮 ---")
+    response = client.chat.completions.create(
+        model="deepseek-chat",
+        messages=messages,
+        tools=tools_description,
+        tool_choice="auto"
+    )
     
-    # 提取大模型从我们自然语言中“猜”出来的参数（比如“北京”）
-    function_name = tool_call.function.name
-    arguments = json.loads(tool_call.function.arguments)
-    print(f"🤖 [大模型请求]：请在本地帮我运行 {function_name} 函数，参数是：{arguments}")
+    ai_msg = response.choices[0].message
+    messages.append(ai_msg) # 把大模型的对话加入记忆
     
-    # 我们在本地帮它运行！
-    if function_name == "get_weather":
-        final_result = get_weather(location=arguments.get("location"))
-        print(f"✅ [本地执行完毕]，得到的数据是：{final_result}")
-else:
-    # 大模型没用工具，纯靠自己脑补说话
-    print(f"🤖 大模型直接回复了：{ai_message.content}")
+    if getattr(ai_msg, "tool_calls", None):
+        tool_call = ai_msg.tool_calls[0]
+        func_name = tool_call.function.name
+        args = json.loads(tool_call.function.arguments)
+        print(f"🤖 [大模型决策]：需要调用工具 => {func_name}，参数：{args}")
+        
+        # 路由到对应的本地函数
+        if func_name == "extract_data_summary":
+            res = extract_data_summary(**args)
+        elif func_name == "impute_missing_values":
+            res = impute_missing_values(**args)
+        elif func_name == "detect_anomalies":
+            res = detect_anomalies(**args)
+        else:
+            res = json.dumps({"error": "找不到工具"})
+            
+        print(f"✅ [本地执行结果]：{res}")
+        messages.append({"role": "tool", "tool_call_id": tool_call.id, "content": res})
+        
+    else:
+        print(f"\n✨ [大模型最终总结]：\n{ai_msg.content}")
+        break  # 如果他不调工具了，说明任务完成了，退出循环
+
 
