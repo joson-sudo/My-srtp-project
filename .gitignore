@@ -1,19 +1,23 @@
-﻿# ======== Python 环境与缓存 ========
+# Python bytecode
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Virtual environments
 .venv/
 venv/
-env/
-__pycache__/
-*.pyc
 
-# ======== 密码与机密配置 ========
-.env
+# Build/test artifacts
+.pytest_cache/
+.mypy_cache/
+coverage/
+htmlcov/
 
-# ======== 日志与工作区配置 ========
-*.log
-.vscode/
+# Runtime outputs
+results/
+results_*/
+logs/
+cache/
 
-# ======== 数据文件 (非常关键) ========
-data/
-*.csv
-*.xlsx
-*.parquet
+# Notebook checkpoints
+.ipynb_checkpoints/

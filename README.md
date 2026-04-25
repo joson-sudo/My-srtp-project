@@ -1,54 +1,70 @@
-﻿# 🏭 工业时间序列数据分析智能体 (Industrial AI Data Scientist Agent)
+# 面向工业时间序列的自主分析智能体系统
+## Autonomous Agent System for Industrial Time Series Analysis
 
-**SRTP（大学生创新创业训练计划）项目** 
-> 致力于将大语言模型（LLM Agent）引入工业数据处理领域，打造一个“能看懂CSV、会自己选算法、全自动出报告”的本地化 AI 架构。
+### 1. 研究目标
+本项目面向工业场景中的多变量时间序列数据，构建一套可复现、可扩展的多智能体分析系统。系统以大语言模型承担任务规划与策略决策，以本地Python算法库承担数值计算与模型训练，目标是形成从数据清洗到预测评估的端到端自动化流程。
 
----
+### 2. 方法框架
+系统基于 LangGraph 构建五节点流水线：
+- Preprocess Agent：缺失值处理、异常值控制、数据质量分析。
+- Analysis Agent：趋势、季节性、平稳性及潜在风险分析。
+- Validation Agent：候选模型筛选、超参数搜索与验证集评估。
+- Forecast Agent：单模型预测、加权集成预测、测试集指标计算。
+- Report Agent：生成结构化实验总结与结果报告。
 
-## 📂 项目架构 (Project Architecture)
+### 3. 关键设计
+- 决策与计算解耦：LLM不直接处理高维矩阵运算，只负责任务规划。
+- 本地函数执行：统计、机器学习与预测模型均在本地执行，保证结果可验证。
+- 可控自动调参：支持组合数上限与耐心值早停，避免无约束试错。
+- 统一模型工厂：通过 llm_factory 统一初始化 OpenAI/Anthropic 模型，减少重复代码。
 
-当前项目采用模块化设计，清晰地分离了“大脑”、“工具”和“数据”。
+### 4. 环境要求
+- Python 3.10+
+- 建议使用虚拟环境
 
-```text
-📦 srtp
- ┣ 📂 agent/                   # 🧠 智能中枢 (LLM 大脑模块)
- ┃ ┣ 📜 core_brain.py          # 核心调度器：负责接收指令、规划任务、调用工具
- ┃ ┣ 📜 prompts.py             # 提示词库：为 AI 设定人设与工作流标准
- ┃ ┗ 📜 __init__.py
- ┣ 📂 tools/                   # 🔨 算法工具箱 (Function Calling 工具库)
- ┃ ┣ 📜 data_imputation.py     # 缺失值补全：多项式插值、均值填充等
- ┃ ┣ 📜 anomaly_detection.py   # 异常检测：3-Sigma, 孤立森林等（待接入GitHub开源库）
- ┃ ┣ 📜 time_series_forecast.py# 时序预测：ARIMA, Prophet等
- ┃ ┗ 📜 __init__.py
- ┣ 📂 data/                    # 🧪 工业数据存放区 (由 MCP 机制提供数据感知)
- ┃ ┗ 📜 sample_data.csv        # 测试用时序数据集
- ┣ 📜 main.py                  # 🚀 系统统一启动入口 (目前已跑通 Tool Call 雏形)
- ┣ 📜 requirements.txt         # ⚙️ 环境依赖表 (Pandas, OpenAI, 等)
- ┣ 📜 .env                     # 🔒 密钥保管箱 (被 .gitignore 保护)
- ┗ 📜 .gitignore               # 🛡️ Git 上传白名单配置
+安装依赖：
+
+```bash
+cd time_series_agent
+pip install -r requirements.txt
 ```
 
----
+### 5. 运行方式
+在仓库根目录执行：
 
-## 📈 当前已完成进度 (Current Progress)
+```bash
+python time_series_agent/main.py \
+  --data dataset/ETTh1.csv \
+  --output-dir results_midterm \
+  --num-slices 10 \
+  --input-length 512 \
+  --horizon 96 \
+  --k-models 3 \
+  --llm-provider anthropic \
+  --llm-model claude-3-5-sonnet-20241022
+```
 
-1. **环境与基建搭建**：
-   - 完成 Python 与 Git 的标准化工业开发环境搭建。
-   - 配置环境隔离机制与凭证保护机制（.env）。
-2. **底层通讯与链路打通**：
-   - 成功接入国内头部大语言模型（DeepSeek）API。
-   - 解决 Windows 系统下底层文本隐形字符等通讯劫持 Bug。
-3. **Agent 核心范式验证**：
-   - 成功在本地以 main.py 跑通标准的 **Function Calling** 机制。
-   - 证实了 LLM 可以根据自然语言自主决策并提取参数，驱动本地 Python 函数（工具）的执行闭环。
-4. **全自动闭环交互与算法引入（最新升级！）**：
-   - 构建了“数据感知”层：大模型可使用 `Pandas` 自动读取并总结 `data` 文件夹表特征。
-   - 实现了孤立森林异常检测、均值数据插补算法的 `tools` 封装。
-   - 打通了多轮通讯：现在 `main.py` 能够自主编排子任务，实现“读数据 -> 补数据 -> 找异常”的全自动流水线。
+常用参数说明：
+- --slice-delay-seconds：切片之间延迟秒数，用于缓解API限流。
+- --debug：启用图执行流式调试模式。
+- --date-column 与 --value-column：指定输入数据时间列与目标列名。
 
-## 🎯 下一步计划 (Next Steps)
+### 6. 环境变量
+根据模型提供方配置API Key：
 
-1. **接入高级预测算法**：完善 `time_series_forecast.py` 中的 ARIMA/Prophet 真实依赖封装。
-2. **数据可视化与前端展示**：通过大模型直接生成代码并输出 Echarts 或 Matplotlib 图表，构建简易的网页 UI。
-3. **Agent 工作流进阶**：从单一 Agent 升级为多智能体协同（例如一个做数据处理，一个专门负责校验）。
+```bash
+# Anthropic
+set ANTHROPIC_API_KEY=your_key
 
+# OpenAI
+set OPENAI_API_KEY=your_key
+```
+
+### 7. 输出产物
+运行完成后，系统会在 output_dir/reports 下生成：
+- complete_time_series_report_时间戳.json：全流程结果（含每个切片中间状态）。
+- aggregated_forecast_results_时间戳.json：跨切片聚合后的最终指标与预测结果。
+
+### 8. 参考文献
+- Zhao, H., et al. TimeSeriesScientist: A General-Purpose AI Agent for Time Series Analysis. arXiv:2510.01538.
+- Liu, F. T., Ting, K. M., Zhou, Z.-H. Isolation Forest. ICDM 2008.
