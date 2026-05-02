@@ -1,25 +1,51 @@
-import pandas as pd
 import json
+import pandas as pd
 
-def forecast_series(file_path: str, column: str, steps: int = 5) -> str:
-    """使用简单移动平均方法预测未来趋势 (简化版占位符)"""
+def forecast_series(
+    file_path: str,
+    column: str,
+    steps: int = 5,
+    method: str = "moving_average",
+    window: int = 5,
+    alpha: float = 0.4
+) -> str:
+    """使用基线方法预测未来趋势"""
     try:
         df = pd.read_csv(file_path)
         if column not in df.columns:
             return json.dumps({"status": "error", "message": f"列名 {column} 不存在。"}, ensure_ascii=False)
-            
-        # 这里为了快速部署，暂用 Pandas 的指数平滑或移动平均模拟 ARIMA
-        # 后续可以升级为来自 statsmodels 的 ARIMA
-        recent_data = df[column].dropna().tail(3)
-        if len(recent_data) == 0:
+
+        try:
+            steps = int(steps)
+        except (TypeError, ValueError):
+            return json.dumps({"status": "error", "message": "steps 必须是整数。"}, ensure_ascii=False)
+
+        if steps <= 0:
+            return json.dumps({"status": "error", "message": "steps 必须大于 0。"}, ensure_ascii=False)
+
+        series = df[column].dropna()
+        if series.empty:
             return json.dumps({"status": "error", "message": "没有足够的数据来进行预测。"}, ensure_ascii=False)
-            
-        trend_value = recent_data.mean()
-        forecast = [round(trend_value, 2)] * steps
-        
+
+        method = method.lower().strip()
+        if method not in {"moving_average", "ewm", "last"}:
+            return json.dumps({"status": "error", "message": f"不支持的预测方法: {method}。"}, ensure_ascii=False)
+
+        if method == "last":
+            value = float(series.iloc[-1])
+        elif method == "ewm":
+            if not 0 < alpha < 1:
+                return json.dumps({"status": "error", "message": "alpha 必须在 0 和 1 之间。"}, ensure_ascii=False)
+            value = float(series.ewm(alpha=alpha, adjust=False).mean().iloc[-1])
+        else:
+            window = max(1, int(window))
+            value = float(series.tail(window).mean())
+
+        forecast = [round(value, 2)] * int(steps)
+
         return json.dumps({
             "status": "success",
-            "message": f"已成功预测接下来 {steps} 个时间点的数值。",
+            "message": f"已使用 {method} 方法预测接下来 {steps} 个时间点的数值。",
             "forecast_values": forecast
         }, ensure_ascii=False)
     except Exception as e:

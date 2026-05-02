@@ -18,6 +18,7 @@ results/
 results_*/
 logs/
 cache/
+outputs/
 
 # Notebook checkpoints
 .ipynb_checkpoints/

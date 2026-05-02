@@ -9,6 +9,20 @@ def detect_anomalies(file_path: str, column: str, contamination: float = 0.1) ->
         if column not in df.columns:
             return json.dumps({"status": "error", "message": f"列名 {column} 不存在。"}, ensure_ascii=False)
         
+        try:
+            contamination = float(contamination)
+        except (TypeError, ValueError):
+            return json.dumps({
+                "status": "error",
+                "message": "contamination 必须是数值。"
+            }, ensure_ascii=False)
+
+        if not 0 < contamination < 0.5:
+            return json.dumps({
+                "status": "error",
+                "message": "contamination 必须在 0 和 0.5 之间。"
+            }, ensure_ascii=False)
+
         # 提取需要检测的列
         col_data = df[column].copy()
         

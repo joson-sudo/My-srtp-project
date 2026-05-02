@@ -12,7 +12,14 @@ def impute_missing_values(file_path: str, column: str, method: str = 'mean') -> 
         if missing_count == 0:
             return json.dumps({"status": "success", "message": f"列 {column} 暂无缺失值。"}, ensure_ascii=False)
         
-        if method == 'mean':
+        method = method.lower().strip()
+        if method not in {"mean", "forward"}:
+            return json.dumps({
+                "status": "error",
+                "message": f"不支持的填补方法: {method}。"
+            }, ensure_ascii=False)
+
+        if method == "mean":
             fill_value = df[column].mean()
             df = df.copy() # Avoid SettingWithCopyWarning
             df[column] = df[column].fillna(fill_value)
