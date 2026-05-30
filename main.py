@@ -24,6 +24,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--forecast-method", choices=["moving_average", "ewm", "last"], default="moving_average")
     parser.add_argument("--forecast-window", type=int, default=5)
     parser.add_argument("--forecast-alpha", type=float, default=0.4)
+    parser.add_argument("--deep-anomaly-method", choices=["isolation_forest", "autoencoder", "vae"], default="isolation_forest")
+    parser.add_argument("--deep-forecast-method", choices=["lstm", "transformer"], default="lstm")
+    parser.add_argument("--multimodal", action="store_true", help="Enable cross-modal diagnosis")
+    parser.add_argument("--image-path", default=None, help="Equipment image for vision analysis")
     parser.add_argument("--model", default="deepseek-chat")
     parser.add_argument("--base-url", default=None)
     parser.add_argument("--max-steps", type=int, default=6)
@@ -72,7 +76,11 @@ def main() -> None:
         forecast_steps=args.forecast_steps,
         forecast_method=args.forecast_method,
         forecast_window=args.forecast_window,
-        forecast_alpha=args.forecast_alpha
+        forecast_alpha=args.forecast_alpha,
+        deep_anomaly_method=args.deep_anomaly_method,
+        deep_forecast_method=args.deep_forecast_method,
+        use_multimodal=args.multimodal,
+        image_path=args.image_path,
     )
 
     messages = run_tool_loop(
