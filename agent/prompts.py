@@ -1,26 +1,23 @@
 def build_user_prompt(
     data_path: str,
     target_column: str,
-    contamination: float,
     forecast_steps: int,
-    forecast_method: str,
-    forecast_window: int,
-    forecast_alpha: float,
 ) -> str:
     return (
-        "You are an industrial time-series analysis agent. Use the available tools to analyze the dataset and make reasonable decisions based on tool results.\n\n"
-        "Start by inspecting the dataset summary before deciding how to handle missing values.\n"
-        "If the target column contains missing values, choose ONE imputation method from the available tool options based on the observed data characteristics.\n"
-        "Do not assume a fixed imputation method in advance. Briefly explain why you chose that method.\n"
-        "After imputation, continue subsequent analysis using the processed output file returned by the imputation tool, not the original raw file.\n"
-        "Then perform anomaly detection and forecasting.\n\n"
-        f"Data file: {data_path}\n"
+        "You are an industrial time-series analysis agent. Your job is to inspect the data, decide what analysis actions are justified, execute them with the available Python tools, evaluate the results, and adapt when necessary.\n\n"
+        "Do not follow a hard-coded preprocessing or forecasting recipe. Important decisions should be made from tool evidence.\n\n"
+        "Working principles:\n"
+        "- Inspect the dataset before making preprocessing decisions.\n"
+        "- If missing values exist, choose an appropriate imputation strategy from the available options and explain the choice.\n"
+        "- Choose a reasonable anomaly-detection method and parameters from the available options.\n"
+        "- If anomalies are found, decide whether they should be kept or handled before forecasting. Use the anomaly-handling tool only when justified by the downstream task.\n"
+        "- Before making the final forecast, compare available lightweight forecasting candidates with the evaluation tool whenever the data is sufficient.\n"
+        "- Select the final forecasting method and parameters using the evaluation evidence rather than intuition alone.\n"
+        "- If a tool fails or the data is too small for a requested operation, adapt the plan instead of inventing results.\n"
+        "- Preserve the raw CSV. Whenever a preprocessing tool returns output_file, continue later analysis on that returned file.\n"
+        "- Do not call tools merely to satisfy a fixed checklist; stop when the analysis is sufficient.\n\n"
+        f"Raw data file: {data_path}\n"
         f"Target column: {target_column}\n"
-        f"Anomaly contamination: {contamination}\n"
-        f"Forecast steps: {forecast_steps}\n"
-        f"Forecast method: {forecast_method}\n"
-        f"Forecast window: {forecast_window}\n"
-        f"Forecast alpha: {forecast_alpha}\n\n"
-        "After using the tools, summarize: (1) what you observed, (2) which imputation method you selected and why, "
-        "(3) anomaly results, (4) forecast results, and (5) any limitations or tool errors."
+        f"Requested forecast horizon: {forecast_steps}\n\n"
+        "In the final answer, report: what you observed, each important decision you made and the evidence for it, anomaly findings and any handling performed, forecast validation evidence, the selected forecast and its values, and important limitations."
     )
