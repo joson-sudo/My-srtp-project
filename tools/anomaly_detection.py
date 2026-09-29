@@ -1,57 +1,68 @@
-import pandas as pd
 import json
+
+import pandas as pd
 from sklearn.ensemble import IsolationForest
 
-def detect_anomalies(file_path: str, column: str, contamination: float = 0.1) -> str:
-    """使用孤立森林检测某列的异常值"""
+
+def detect_anomalies(
+    file_path: str,
+    column: str,
+    method: str = "isolation_forest",
+    contamination: float = 0.1,
+    iqr_multiplier: float = 1.5,
+) -> str:
+    """Detect anomalies with an agent-selected lightweight method."""
     try:
         df = pd.read_csv(file_path)
         if column not in df.columns:
             return json.dumps({"status": "error", "message": f"列名 {column} 不存在。"}, ensure_ascii=False)
-        
-        try:
-            contamination = float(contamination)
-        except (TypeError, ValueError):
-            return json.dumps({
-                "status": "error",
-                "message": "contamination 必须是数值。"
-            }, ensure_ascii=False)
 
-        if not 0 < contamination < 0.5:
-            return json.dumps({
-                "status": "error",
-                "message": "contamination 必须在 0 和 0.5 之间。"
-            }, ensure_ascii=False)
-
-        # 提取需要检测的列
-        col_data = df[column].copy()
-        
-        # 孤立森林不能处理NaN，必须在处理前填充（为了检测临时填充）
+        col_data = pd.to_numeric(df[column], errors="coerce")
         if col_data.isnull().any():
             return json.dumps({
-                "status": "error", 
-                "message": f"列 {column} 存在缺失值(NaN)，孤立森林无法直接处理！请先调用数据填补工具进行处理。"
+                "status": "error",
+                "message": f"列 {column} 存在缺失值，请先完成缺失值处理。"
             }, ensure_ascii=False)
-        
-        # 将数据转为 sklearn 需要的二维数组结构
-        X = col_data.values.reshape(-1, 1)
-        
-        # 实例化并训练模型
-        model = IsolationForest(contamination=contamination, random_state=42)
-        preds = model.fit_predict(X)
-        
-        # preds 返回 1 为正常点， -1 为异常点
-        anomalies_indices = df.index[preds == -1].tolist()
-        anomalies_values = df.loc[anomalies_indices, column].tolist()
-        
+
+        method = method.lower().strip()
+        if method not in {"isolation_forest", "iqr"}:
+            return json.dumps({"status": "error", "message": f"不支持的异常检测方法: {method}"}, ensure_ascii=False)
+
+        details = {}
+        if method == "isolation_forest":
+            contamination = float(contamination)
+            if not 0 < contamination < 0.5:
+                return json.dumps({"status": "error", "message": "contamination 必须在 0 和 0.5 之间。"}, ensure_ascii=False)
+            model = IsolationForest(contamination=contamination, random_state=42)
+            preds = model.fit_predict(col_data.to_numpy().reshape(-1, 1))
+            anomaly_indices = df.index[preds == -1].tolist()
+            details = {"contamination": contamination}
+        else:
+            iqr_multiplier = float(iqr_multiplier)
+            if iqr_multiplier <= 0:
+                return json.dumps({"status": "error", "message": "iqr_multiplier 必须大于 0。"}, ensure_ascii=False)
+            q1 = float(col_data.quantile(0.25))
+            q3 = float(col_data.quantile(0.75))
+            iqr = q3 - q1
+            lower = q1 - iqr_multiplier * iqr
+            upper = q3 + iqr_multiplier * iqr
+            mask = (col_data < lower) | (col_data > upper)
+            anomaly_indices = df.index[mask].tolist()
+            details = {
+                "iqr_multiplier": iqr_multiplier,
+                "lower_bound": round(lower, 6),
+                "upper_bound": round(upper, 6),
+            }
+
+        anomaly_values = [float(df.loc[i, column]) for i in anomaly_indices]
         return json.dumps({
             "status": "success",
-            "message": f"孤立森林算法已经完成运算。",
+            "method": method,
             "total_checked": len(df),
-            "anomaly_count": len(anomalies_indices),
-            "anomalies_indices": anomalies_indices,
-            "anomalies_values": anomalies_values
+            "anomaly_count": len(anomaly_indices),
+            "anomalies_indices": anomaly_indices,
+            "anomalies_values": anomaly_values,
+            "details": details,
         }, ensure_ascii=False)
-        
     except Exception as e:
         return json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False)
