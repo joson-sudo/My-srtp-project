@@ -17,11 +17,15 @@ logger = logging.getLogger(__name__)
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Adaptive industrial time-series analysis agent")
     parser.add_argument("--data", dest="data_path", default="data/sample_data.csv")
-    parser.add_argument("--column", default="temperature")
+    parser.add_argument(
+        "--column",
+        default=None,
+        help="Analyze only this column. If omitted, analyze all suitable numeric measurement columns.",
+    )
     parser.add_argument("--forecast-steps", type=int, default=5)
     parser.add_argument("--model", default="deepseek-chat")
     parser.add_argument("--base-url", default=None)
-    parser.add_argument("--max-steps", type=int, default=10)
+    parser.add_argument("--max-steps", type=int, default=12)
     parser.add_argument("--output-dir", default="outputs")
     parser.add_argument("--env-file", default=".env")
     parser.add_argument("--log-level", default="INFO")
