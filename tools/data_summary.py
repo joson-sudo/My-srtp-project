@@ -3,7 +3,7 @@ import pandas as pd
 
 
 def extract_data_summary(file_path: str = "data/sample_data.csv", head_rows: int = 5) -> str:
-    """Return summary metadata for a CSV file."""
+    """Return summary metadata for a CSV file, including candidate numeric targets."""
     try:
         df = pd.read_csv(file_path)
         head_rows = max(0, int(head_rows))
@@ -15,9 +15,19 @@ def extract_data_summary(file_path: str = "data/sample_data.csv", head_rows: int
             if df[col].isnull().any()
         }
 
+        numeric_columns = df.select_dtypes(include="number").columns.tolist()
+        excluded_name_tokens = ("id", "index", "time", "date", "timestamp")
+        candidate_numeric_targets = [
+            col for col in numeric_columns
+            if not any(token in col.lower() for token in excluded_name_tokens)
+        ]
+
         summary = {
             "rows": int(len(df)),
             "columns": list(df.columns),
+            "dtypes": {col: str(dtype) for col, dtype in df.dtypes.items()},
+            "numeric_columns": numeric_columns,
+            "candidate_numeric_targets": candidate_numeric_targets,
             "missing": missing,
             "missing_indices": missing_indices,
             "describe": json.loads(df.describe().to_json())
