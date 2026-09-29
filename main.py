@@ -25,7 +25,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--forecast-steps", type=int, default=5)
     parser.add_argument("--model", default="deepseek-chat")
     parser.add_argument("--base-url", default=None)
-    parser.add_argument("--max-steps", type=int, default=12)
+    parser.add_argument("--max-steps", type=int, default=20)
     parser.add_argument("--output-dir", default="outputs")
     parser.add_argument("--env-file", default=".env")
     parser.add_argument("--log-level", default="INFO")
