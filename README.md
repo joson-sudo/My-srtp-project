@@ -1,58 +1,70 @@
-# Industrial Time-Series Analysis Agent (Core Version)
+# Industrial Time-Series Analysis Agent (Adaptive Core Version)
 
-This branch contains a minimal, explainable SRTP prototype focused on **LLM tool calling for industrial time-series analysis**.
+This branch contains a small, explainable SRTP prototype for **LLM-guided industrial time-series analysis**.
 
-The large multimodal / deep-learning prototype is preserved on the `main` branch. This `core-clean` branch intentionally keeps only the core workflow that is currently being studied and maintained.
+The large multimodal / deep-learning prototype remains on the `main` branch. The current `core-clean` branch focuses on one research question: can an LLM use tool feedback to make useful analysis decisions instead of merely executing a hard-coded pipeline?
 
-## What the system does
+## Core idea
 
-Given a CSV file and a target numeric column, the agent can:
+The LLM does **not** directly calculate numerical results from the CSV. Python tools perform data processing, anomaly detection, validation, and forecasting. The LLM observes tool outputs and decides what action should come next.
 
-1. inspect the dataset summary;
-2. fill missing values when needed;
-3. detect anomalies with Isolation Forest;
-4. produce a simple baseline forecast;
-5. let the LLM summarize the tool results.
+The workflow is intentionally constrained but adaptive:
 
-The LLM does **not** directly calculate on the CSV. It decides which registered Python tool to call, receives that tool's result, and then decides the next step.
+```text
+raw CSV
+   |
+   v
+inspect data
+   |
+   v
+LLM decides missing-value strategy (if needed)
+   |
+   v
+LLM chooses anomaly detection method/parameters
+   |
+   v
+LLM decides whether detected anomalies should be kept or handled
+   |
+   v
+Python evaluates several lightweight forecasting candidates
+   |
+   v
+LLM selects a final forecast method from validation evidence
+   |
+   v
+final report with decisions, evidence, and limitations
+```
+
+This is not unrestricted autonomy. The agent operates inside a registered tool set, while important strategy choices are left to the LLM and numerical claims are grounded in tool results.
+
+## Available tools
+
+- `extract_data_summary`: rows, columns, missing locations, statistics, sample rows
+- `impute_missing_values`: mean / median / forward fill / interpolation
+- `detect_anomalies`: Isolation Forest / IQR rule
+- `handle_anomalies`: keep / interpolate / median replacement / IQR clipping
+- `evaluate_forecast_methods`: rolling validation with MAE and RMSE for lightweight candidates
+- `forecast_series`: last value / moving average / exponential smoothing / linear trend
+
+Preprocessing tools preserve the input file and return a new `output_file`; later tools should continue from that file.
 
 ## Core architecture
 
 ```text
 main.py
   |
-  +--> agent/prompts.py        build the task prompt
+  +--> agent/prompts.py        defines goals and decision principles
   |
-  +--> agent/core_brain.py     LLM <-> tool calling loop
+  +--> agent/core_brain.py     LLM <-> tool-calling loop
               |
               +--> tools/registry.py
                         |
                         +--> data_summary.py
                         +--> data_imputation.py
                         +--> anomaly_detection.py
+                        +--> anomaly_handling.py
+                        +--> forecast_evaluation.py
                         +--> time_series_forecast.py
-```
-
-## Project layout
-
-```text
-.
-├── main.py
-├── config.py
-├── requirements.txt
-├── agent/
-│   ├── __init__.py
-│   ├── core_brain.py
-│   └── prompts.py
-├── tools/
-│   ├── __init__.py
-│   ├── registry.py
-│   ├── data_summary.py
-│   ├── data_imputation.py
-│   ├── anomaly_detection.py
-│   └── time_series_forecast.py
-└── data/
-    └── sample_data.csv
 ```
 
 ## Setup
@@ -64,6 +76,7 @@ python -m venv .venv
 Windows PowerShell:
 
 ```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 ```
@@ -74,33 +87,28 @@ Create a `.env` file in the project root:
 DEEPSEEK_API_KEY=your_key_here
 ```
 
-The default API endpoint is `https://api.deepseek.com` and the default model is `deepseek-chat`.
-
 ## Run
 
 ```powershell
 python main.py --data data/sample_data.csv --column temperature
 ```
 
-Useful options:
+Optional arguments are deliberately limited to task-level requirements rather than analysis strategies:
 
 ```text
---impute-method mean|forward
---contamination 0.1
 --forecast-steps 5
---forecast-method moving_average|ewm|last
---forecast-window 5
---forecast-alpha 0.4
+--model deepseek-chat
+--max-steps 10
 ```
 
-The final LLM summary is printed in the terminal. The complete trace is also saved under:
+The final LLM report is printed in the terminal. The complete interaction trace is saved under:
 
 ```text
 outputs/run_YYYYMMDD_HHMMSS.json
 ```
 
-## Current scope
+## Current scope and limitations
 
-This branch is deliberately a small prototype. It does not claim a novel forecasting model or a production-ready industrial system. The present goal is to make the agent workflow understandable, reproducible, and easy to evaluate before adding more advanced models.
+This is a research prototype, not a production industrial system and not a claim of a novel forecasting model. The current focus is the **agent decision loop**: observe tool evidence, choose an action, execute it, inspect the result, and adapt.
 
-Future work can reintroduce selected deep-learning modules from the `main` branch after they are understood and experimentally validated.
+The forecasting library is intentionally small. More advanced statistical or deep-learning models can be added later, but only after the current decision process and evaluation method are understood and tested on larger public datasets.
