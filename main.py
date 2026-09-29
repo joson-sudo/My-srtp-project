@@ -18,7 +18,6 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Industrial time-series analysis agent")
     parser.add_argument("--data", dest="data_path", default="data/sample_data.csv")
     parser.add_argument("--column", default="temperature")
-    parser.add_argument("--impute-method", choices=["mean", "forward"], default="mean")
     parser.add_argument("--contamination", type=float, default=0.1)
     parser.add_argument("--forecast-steps", type=int, default=5)
     parser.add_argument("--forecast-method", choices=["moving_average", "ewm", "last"], default="moving_average")
@@ -74,7 +73,6 @@ def main() -> None:
     user_prompt = build_user_prompt(
         data_path=args.data_path,
         target_column=args.column,
-        impute_method=args.impute_method,
         contamination=args.contamination,
         forecast_steps=args.forecast_steps,
         forecast_method=args.forecast_method,
