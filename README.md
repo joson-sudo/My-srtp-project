@@ -135,6 +135,14 @@ Example single-column test on transformer oil temperature:
 python main.py --data data/ETTh1_agent_test.csv --column OT
 ```
 
+## Real run example
+
+A real 1000-row, seven-target ETTh1 run is documented here:
+
+- [`docs/example_etth1_run.md`](docs/example_etth1_run.md)
+
+In that run the agent independently chose interpolation for missing values, IQR-based anomaly detection, whether to keep flagged anomalies, and final forecasting methods from rolling MAE/RMSE evidence.
+
 ## Run options
 
 Analysis strategies are deliberately not exposed as command-line arguments. The user specifies task-level requirements and the agent chooses analysis strategies from tool evidence.
