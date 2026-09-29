@@ -28,5 +28,10 @@ logs/
 cache/
 outputs/
 
+# Generated local ETTh1 test data (reproducible via scripts/prepare_etth1.py)
+data/ETTh1_1000.csv
+data/ETTh1_agent_test.csv
+data/ETTh1_agent_test_ground_truth.json
+
 # Notebook checkpoints
 .ipynb_checkpoints/
