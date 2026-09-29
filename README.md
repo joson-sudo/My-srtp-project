@@ -14,7 +14,7 @@ The workflow is intentionally constrained but adaptive:
 raw CSV
    |
    v
-inspect data
+inspect data and identify suitable numeric targets
    |
    v
 LLM decides missing-value strategy (if needed)
@@ -37,9 +37,25 @@ final report with decisions, evidence, and limitations
 
 This is not unrestricted autonomy. The agent operates inside a registered tool set, while important strategy choices are left to the LLM and numerical claims are grounded in tool results.
 
+## Multi-column behavior
+
+If `--column` is omitted, the agent inspects the dataset and analyzes all suitable numeric measurement columns while ignoring metadata-like fields such as timestamps, dates, IDs, and indices.
+
+```powershell
+python main.py --data data/sample_data.csv
+```
+
+To analyze only one target, specify it explicitly:
+
+```powershell
+python main.py --data data/sample_data.csv --column temperature
+```
+
+When preprocessing multiple columns, the agent maintains one current working CSV. Each returned `output_file` becomes the input for later actions so changes to earlier columns are not lost.
+
 ## Available tools
 
-- `extract_data_summary`: rows, columns, missing locations, statistics, sample rows
+- `extract_data_summary`: rows, columns, numeric target candidates, missing locations, statistics, sample rows
 - `impute_missing_values`: mean / median / forward fill / interpolation
 - `detect_anomalies`: Isolation Forest / IQR rule
 - `handle_anomalies`: keep / interpolate / median replacement / IQR clipping
@@ -87,18 +103,48 @@ Create a `.env` file in the project root:
 DEEPSEEK_API_KEY=your_key_here
 ```
 
-## Run
+## Larger ETTh1 test data
+
+A reproducible preparation script is included instead of committing a large public benchmark CSV directly.
+
+From the project root run:
 
 ```powershell
-python main.py --data data/sample_data.csv --column temperature
+python scripts/prepare_etth1.py
 ```
 
-Optional arguments are deliberately limited to task-level requirements rather than analysis strategies:
+This downloads the public ETTh1 benchmark and creates:
 
 ```text
+data/ETTh1_1000.csv
+data/ETTh1_agent_test.csv
+data/ETTh1_agent_test_ground_truth.json
+```
+
+`ETTh1_1000.csv` is the untouched first 1000 hourly rows. `ETTh1_agent_test.csv` additionally contains controlled missing values and artificial spikes so the agent's decisions can be checked against known ground truth. See `data/ETTh1_TESTING.md` for details.
+
+Example all-column test:
+
+```powershell
+python main.py --data data/ETTh1_agent_test.csv
+```
+
+Example single-column test on transformer oil temperature:
+
+```powershell
+python main.py --data data/ETTh1_agent_test.csv --column OT
+```
+
+## Run options
+
+Analysis strategies are deliberately not exposed as command-line arguments. The user specifies task-level requirements and the agent chooses analysis strategies from tool evidence.
+
+```text
+--data <csv path>
+--column <optional target column>
 --forecast-steps 5
 --model deepseek-chat
---max-steps 10
+--max-steps 20
 ```
 
 The final LLM report is printed in the terminal. The complete interaction trace is saved under:
