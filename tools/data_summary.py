@@ -9,10 +9,17 @@ def extract_data_summary(file_path: str = "data/sample_data.csv", head_rows: int
         head_rows = max(0, int(head_rows))
 
         missing = {col: int(val) for col, val in df.isnull().sum().items()}
+        missing_indices = {
+            col: [int(i) for i in df.index[df[col].isnull()].tolist()]
+            for col in df.columns
+            if df[col].isnull().any()
+        }
+
         summary = {
             "rows": int(len(df)),
             "columns": list(df.columns),
             "missing": missing,
+            "missing_indices": missing_indices,
             "describe": json.loads(df.describe().to_json())
         }
 
