@@ -15,17 +15,13 @@ logger = logging.getLogger(__name__)
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Industrial time-series analysis agent")
+    parser = argparse.ArgumentParser(description="Adaptive industrial time-series analysis agent")
     parser.add_argument("--data", dest="data_path", default="data/sample_data.csv")
     parser.add_argument("--column", default="temperature")
-    parser.add_argument("--contamination", type=float, default=0.1)
     parser.add_argument("--forecast-steps", type=int, default=5)
-    parser.add_argument("--forecast-method", choices=["moving_average", "ewm", "last"], default="moving_average")
-    parser.add_argument("--forecast-window", type=int, default=5)
-    parser.add_argument("--forecast-alpha", type=float, default=0.4)
     parser.add_argument("--model", default="deepseek-chat")
     parser.add_argument("--base-url", default=None)
-    parser.add_argument("--max-steps", type=int, default=6)
+    parser.add_argument("--max-steps", type=int, default=10)
     parser.add_argument("--output-dir", default="outputs")
     parser.add_argument("--env-file", default=".env")
     parser.add_argument("--log-level", default="INFO")
@@ -73,11 +69,7 @@ def main() -> None:
     user_prompt = build_user_prompt(
         data_path=args.data_path,
         target_column=args.column,
-        contamination=args.contamination,
         forecast_steps=args.forecast_steps,
-        forecast_method=args.forecast_method,
-        forecast_window=args.forecast_window,
-        forecast_alpha=args.forecast_alpha,
     )
 
     messages = run_tool_loop(
